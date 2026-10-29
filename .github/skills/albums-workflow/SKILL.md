@@ -1,7 +1,7 @@
 ---
-name: Albums Workflow
+name: albums-workflow
 description: "Run the multi-agent implementation workflow for a feature or bug fix: coding, independent review, and testing."
-agent: Albums Workflow
+disable-model-invocation: true
 argument-hint: "Describe the feature or bug fix and its acceptance criteria"
 ---
 Run the complete multi-agent workflow for this request:

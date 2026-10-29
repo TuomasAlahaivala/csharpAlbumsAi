@@ -1,15 +1,72 @@
 using AlbumsWebApp.Data;
 using AlbumsWebApp.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
-var builder = WebApplication.CreateBuilder(args);
+var initializeAdmin = args.Contains("--initialize-admin", StringComparer.Ordinal);
+var builderArgs = args.Where(argument => argument != "--initialize-admin").ToArray();
+var builder = WebApplication.CreateBuilder(builderArgs);
+DotEnv.Load(builder.Environment.ContentRootPath);
+builder.Configuration.AddEnvironmentVariables();
+
+if (initializeAdmin)
+{
+    AdminCredentialInitializer.Initialize(builder.Environment.ContentRootPath);
+    return;
+}
+
 var connectionString = builder.Configuration.GetConnectionString("AlbumsDb")
     ?? throw new InvalidOperationException("Connection string 'AlbumsDb' is not configured.");
+var adminEmail = builder.Configuration["ADMIN_EMAIL"]
+    ?? throw new InvalidOperationException("ADMIN_EMAIL is not configured. Run the application with --initialize-admin.");
+var adminPasswordHash = builder.Configuration["ADMIN_PASSWORD_HASH"]
+    ?? throw new InvalidOperationException("ADMIN_PASSWORD_HASH is not configured. Run the application with --initialize-admin.");
 
 builder.Services.AddControllers();
 builder.Services.AddDbContext<AlbumsDbContext>(options =>
     options.UseNpgsql(connectionString));
 builder.Services.AddScoped<AlbumStore>();
+builder.Services.AddSingleton(new AdminAuthenticationService(adminEmail, adminPasswordHash));
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "AlbumAuth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.Path = "/";
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+        options.Events.OnRedirectToLogin = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        };
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        };
+    });
+builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("admin-login", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
 
 var app = builder.Build();
 
@@ -29,10 +86,13 @@ app.UseHttpsRedirection();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseRouting();
-app.MapControllers();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers().RequireAuthorization();
 app.Map("/api/{**path}", () => Results.Problem(
     statusCode: StatusCodes.Status404NotFound,
-    title: "API endpoint not found."));
+    title: "API endpoint not found.")).RequireAuthorization();
 app.MapFallbackToFile("index.html");
 
 app.Run();

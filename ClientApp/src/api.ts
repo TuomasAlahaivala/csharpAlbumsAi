@@ -13,12 +13,17 @@ export class ApiError extends Error {
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
+    credentials: "same-origin",
     headers: init?.body
       ? { "Content-Type": "application/json", ...init.headers }
       : init?.headers,
   });
 
   if (!response.ok) {
+    if (response.status === 401 && url !== "/api/auth/login") {
+      window.dispatchEvent(new Event("auth:unauthorized"));
+    }
+
     let problem: ValidationProblem | undefined;
     if (response.headers.get("content-type")?.includes("application/problem+json")) {
       problem = (await response.json()) as ValidationProblem;
@@ -51,4 +56,19 @@ export function updateAlbum(id: number, album: AlbumInput) {
 
 export function deleteAlbum(id: number) {
   return request<void>(`/api/albums/${id}`, { method: "DELETE" });
+}
+
+export function getCurrentUser() {
+  return request<{ email: string }>("/api/auth/me");
+}
+
+export function login(email: string, password: string) {
+  return request<void>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function logout() {
+  return request<void>("/api/auth/logout", { method: "POST" });
 }
