@@ -5,3 +5,4 @@ ClientApp/coverage/
 ClientApp/*.tsbuildinfo
 wwwroot/assets/
 wwwroot/index.html
+.env

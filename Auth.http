@@ -1,0 +1,21 @@
+@baseUrl = http://localhost:5000
+@email = admin-<generated-id>@example.com
+@password = <one-time-generated-password>
+
+### Sign in and store the authentication cookie
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Read the signed-in admin
+GET {{baseUrl}}/api/auth/me
+
+### Sign out
+POST {{baseUrl}}/api/auth/logout
+
+### Verify the session is no longer authenticated
+GET {{baseUrl}}/api/auth/me

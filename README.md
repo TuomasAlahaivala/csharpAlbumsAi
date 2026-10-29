@@ -4,12 +4,17 @@ ASP.NET Core 8 JSON API with a React and TypeScript frontend for tracking music 
 
 ## Run locally
 
-Install the .NET 8 SDK, Node.js, and Docker. Start PostgreSQL and the API:
+Install the .NET 8 SDK, Node.js, and Docker. Generate the admin credentials once, then start PostgreSQL and the API:
 
 ```powershell
+dotnet run -- --initialize-admin
 docker compose up -d
 dotnet run
 ```
+
+The initializer creates a random `admin-...@example.com` email and a strong password, then stores the email and an ASP.NET Core password hash in the git-ignored `.env` file. The password is printed only once; save it because it cannot be recovered from the hash. Keep the `.env` file private and do not commit or share it. Existing `.env` files are never overwritten by the initializer.
+
+The app's album pages and API require sign-in. Use the generated credentials at the sign-in screen; the session is held in an HTTP-only cookie and expires after eight hours. In production, serve the app over HTTPS and provide `ADMIN_EMAIL` and `ADMIN_PASSWORD_HASH` through the deployment's secret configuration instead of a local `.env` file.
 
 In a second terminal, install frontend dependencies and start Vite:
 
