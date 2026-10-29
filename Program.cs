@@ -17,18 +17,23 @@ if (initializeAdmin)
     return;
 }
 
-var connectionString = builder.Configuration.GetConnectionString("AlbumsDb")
-    ?? throw new InvalidOperationException("Connection string 'AlbumsDb' is not configured.");
-var adminEmail = builder.Configuration["ADMIN_EMAIL"]
-    ?? throw new InvalidOperationException("ADMIN_EMAIL is not configured. Run the application with --initialize-admin.");
-var adminPasswordHash = builder.Configuration["ADMIN_PASSWORD_HASH"]
-    ?? throw new InvalidOperationException("ADMIN_PASSWORD_HASH is not configured. Run the application with --initialize-admin.");
-
 builder.Services.AddControllers();
-builder.Services.AddDbContext<AlbumsDbContext>(options =>
-    options.UseNpgsql(connectionString));
+builder.Services.AddDbContext<AlbumsDbContext>((services, options) =>
+{
+    var connectionString = services.GetRequiredService<IConfiguration>().GetConnectionString("AlbumsDb")
+        ?? throw new InvalidOperationException("Connection string 'AlbumsDb' is not configured.");
+    options.UseNpgsql(connectionString);
+});
 builder.Services.AddScoped<AlbumStore>();
-builder.Services.AddSingleton(new AdminAuthenticationService(adminEmail, adminPasswordHash));
+builder.Services.AddSingleton(services =>
+{
+    var configuration = services.GetRequiredService<IConfiguration>();
+    var adminEmail = configuration["ADMIN_EMAIL"]
+        ?? throw new InvalidOperationException("ADMIN_EMAIL is not configured. Run the application with --initialize-admin.");
+    var adminPasswordHash = configuration["ADMIN_PASSWORD_HASH"]
+        ?? throw new InvalidOperationException("ADMIN_PASSWORD_HASH is not configured. Run the application with --initialize-admin.");
+    return new AdminAuthenticationService(adminEmail, adminPasswordHash);
+});
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
