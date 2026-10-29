@@ -73,7 +73,8 @@ var app = builder.Build();
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AlbumsDbContext>();
-    await dbContext.Database.MigrateAsync();
+    if (dbContext.Database.IsRelational())
+        await dbContext.Database.MigrateAsync();
 }
 
 if (!app.Environment.IsDevelopment())
