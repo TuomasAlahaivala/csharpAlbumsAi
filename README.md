@@ -51,6 +51,12 @@ dotnet publish -c Release
 
 The published ASP.NET application serves both `/api/albums` and the React SPA.
 
+## Releases
+
+Releases use [Conventional Commits](https://www.conventionalcommits.org/). Push or merge commits to `master` using `feat:` for features, `fix:` for fixes, and `perf:` for performance improvements. These produce minor or patch version bumps; a `!` after the type or a `BREAKING CHANGE:` footer produces a major bump. Other commit types such as `docs:` and `chore:` do not trigger a release.
+
+The Release Please workflow opens or updates a release pull request with the next semantic version and generated `CHANGELOG.md` entry. Review and merge that pull request to create the corresponding GitHub Release and version tag. The current version is recorded in `version.txt` and is used by the .NET build.
+
 ## Multi-agent development workflow
 
 This workspace includes a Copilot workflow for implementing a feature or bug fix with separate coding, review, and testing roles. In VS Code Chat, run `/albums-workflow` and describe the task and acceptance criteria. The **Albums Workflow** coordinator delegates implementation to **Albums Coder**, requests an independent read-only review from **Albums Reviewer**, and then asks **Albums Tester** to run the relevant checks. Review findings or change-related test failures are sent back to the coder before the workflow completes.

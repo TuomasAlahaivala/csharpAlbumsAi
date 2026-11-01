@@ -1,0 +1,9 @@
+{
+  "bootstrap-sha": "88298edea6d56a1dfa3924e9f1722eac682026ca",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "csharpAlbumsAi"
+    }
+  }
+}
