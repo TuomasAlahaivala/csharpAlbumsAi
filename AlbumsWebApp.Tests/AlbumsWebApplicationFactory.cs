@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -32,6 +33,7 @@ internal sealed class AlbumsWebApplicationFactory : WebApplicationFactory<Progra
         {
             services.RemoveAll<AlbumsDbContext>();
             services.RemoveAll<DbContextOptions<AlbumsDbContext>>();
+            services.RemoveAll<IDbContextOptionsConfiguration<AlbumsDbContext>>();
             services.AddDbContext<AlbumsDbContext>(options =>
                 options.UseInMemoryDatabase(databaseName));
             services.RemoveAll<AdminAuthenticationService>();

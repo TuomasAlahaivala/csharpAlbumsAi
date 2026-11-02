@@ -1,10 +1,10 @@
 # Music Albums Web Application
 
-ASP.NET Core 8 JSON API with a React and TypeScript frontend for tracking music albums. Album data is stored in PostgreSQL, and pending Entity Framework Core migrations are applied when the API starts.
+ASP.NET Core 10 JSON API with a React and TypeScript frontend for tracking music albums. Album data is stored in PostgreSQL, and pending Entity Framework Core migrations are applied when the API starts.
 
 ## Run locally
 
-Install the .NET 8 SDK, Node.js, and Docker. Generate the admin credentials once, then start PostgreSQL and the API:
+Install the .NET 10 SDK, Node.js, and Docker. Generate the admin credentials once, then start PostgreSQL and the API:
 
 ```powershell
 dotnet run -- --initialize-admin
@@ -26,7 +26,7 @@ npm run dev
 
 Open `http://localhost:5173`. Vite proxies `/api` to `http://localhost:5000` by default. If ASP.NET uses another address, set `ASPNETCORE_URLS` to that address before starting Vite.
 
-The default development database is `localhost:5432`, database `albums`, user `albums`, and password `albums_dev`. Override it with:
+The default development database is `localhost:5433`, database `albums`, user `albums`, and password `albums_dev`. Override it with:
 
 ```powershell
 $env:ConnectionStrings__AlbumsDb = "Host=server;Port=5432;Database=albums;Username=user;Password=password"
