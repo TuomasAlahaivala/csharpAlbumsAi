@@ -7,6 +7,16 @@ namespace AlbumsWebApp.Tests;
 public sealed class AppTests
 {
     [Fact]
+    public async Task Health_endpoints_are_public_and_report_readiness()
+    {
+        using var factory = new AlbumsWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/live")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/ready")).StatusCode);
+    }
+
+    [Fact]
     public async Task Admin_can_create_view_update_search_and_delete_albums()
     {
         using var factory = new AlbumsWebApplicationFactory();

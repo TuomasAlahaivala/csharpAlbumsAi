@@ -3,6 +3,7 @@ using AlbumsWebApp.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using System.Threading.RateLimiting;
 
 var initializeAdmin = args.Contains("--initialize-admin", StringComparer.Ordinal);
@@ -10,6 +11,19 @@ var builderArgs = args.Where(argument => argument != "--initialize-admin").ToArr
 var builder = WebApplication.CreateBuilder(builderArgs);
 DotEnv.Load(builder.Environment.ContentRootPath);
 builder.Configuration.AddEnvironmentVariables();
+
+if (!builder.Environment.IsDevelopment()
+    && builder.Configuration["ForwardedHeaders:TrustedNetwork"] is { } trustedNetwork)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.ForwardLimit = 1;
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(trustedNetwork));
+    });
+}
 
 if (initializeAdmin)
 {
@@ -84,11 +98,17 @@ await using (var scope = app.Services.CreateAsyncScope())
 
 if (!app.Environment.IsDevelopment())
 {
+    app.UseForwardedHeaders();
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
+app.MapGet("/health/live", () => Results.Ok(new { status = "live" })).AllowAnonymous();
+app.MapGet("/health/ready", async (AlbumsDbContext dbContext, CancellationToken cancellationToken) =>
+    !dbContext.Database.IsRelational() || await dbContext.Database.CanConnectAsync(cancellationToken)
+        ? Results.Ok(new { status = "ready" })
+        : Results.StatusCode(StatusCodes.Status503ServiceUnavailable)).AllowAnonymous();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseRouting();

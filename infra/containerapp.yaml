@@ -1,0 +1,62 @@
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 8080
+      transport: auto
+      allowInsecure: false
+    registries:
+      - server: ${ACR_LOGIN_SERVER}
+        identity: ${WORKLOAD_IDENTITY_RESOURCE_ID}
+    secrets:
+      - name: albums-db
+        keyVaultUrl: ${KEY_VAULT_URI}/secrets/albums-db-connection-string
+        identity: ${WORKLOAD_IDENTITY_RESOURCE_ID}
+      - name: admin-email
+        keyVaultUrl: ${KEY_VAULT_URI}/secrets/admin-email
+        identity: ${WORKLOAD_IDENTITY_RESOURCE_ID}
+      - name: admin-password-hash
+        keyVaultUrl: ${KEY_VAULT_URI}/secrets/admin-password-hash
+        identity: ${WORKLOAD_IDENTITY_RESOURCE_ID}
+  template:
+    containers:
+      - name: albums
+        image: ${IMAGE}
+        env:
+          - name: ASPNETCORE_ENVIRONMENT
+            value: Production
+          - name: ASPNETCORE_HTTP_PORTS
+            value: "8080"
+          - name: ForwardedHeaders__TrustedNetwork
+            value: ${CONTAINER_APPS_SUBNET_PREFIX}
+          - name: ConnectionStrings__AlbumsDb
+            secretRef: albums-db
+          - name: ADMIN_EMAIL
+            secretRef: admin-email
+          - name: ADMIN_PASSWORD_HASH
+            secretRef: admin-password-hash
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+        probes:
+          - type: Startup
+            httpGet:
+              path: /health/live
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 30
+          - type: Liveness
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          - type: Readiness
+            httpGet:
+              path: /health/ready
+              port: 8080
+            periodSeconds: 10
+    scale:
+      minReplicas: 1
+      maxReplicas: 3
