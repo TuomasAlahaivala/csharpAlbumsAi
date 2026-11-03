@@ -1,0 +1,113 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Test, build, and deploy
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_CONTAINER_REGISTRY: ${{ vars.AZURE_CONTAINER_REGISTRY }}
+      AZURE_CONTAINER_APP: ${{ vars.AZURE_CONTAINER_APP }}
+      AZURE_CONTAINER_APP_ENVIRONMENT: ${{ vars.AZURE_CONTAINER_APP_ENVIRONMENT }}
+      AZURE_KEY_VAULT: ${{ vars.AZURE_KEY_VAULT }}
+      AZURE_WORKLOAD_IDENTITY_RESOURCE_ID: ${{ vars.AZURE_WORKLOAD_IDENTITY_RESOURCE_ID }}
+      AZURE_CONTAINER_APPS_SUBNET_PREFIX: ${{ vars.AZURE_CONTAINER_APPS_SUBNET_PREFIX }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test .NET application
+        run: dotnet test AlbumsWebApp.Tests/AlbumsWebApp.Tests.csproj --configuration Release
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ClientApp/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ClientApp
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: ClientApp
+        run: npm run lint
+
+      - name: Test frontend
+        working-directory: ClientApp
+        run: npm test
+
+      - name: Sign in to Azure with GitHub OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push container image
+        env:
+          ACR_NAME: ${{ vars.AZURE_CONTAINER_REGISTRY }}
+        run: |
+          az acr login --name "$ACR_NAME"
+          image="$ACR_NAME.azurecr.io/albums-webapp:$GITHUB_SHA"
+          docker build --tag "$image" .
+          docker push "$image"
+
+      - name: Deploy container app
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.AZURE_CONTAINER_REGISTRY }}.azurecr.io
+          IMAGE: ${{ vars.AZURE_CONTAINER_REGISTRY }}.azurecr.io/albums-webapp:${{ github.sha }}
+          KEY_VAULT_URI: https://${{ vars.AZURE_KEY_VAULT }}.vault.azure.net
+          WORKLOAD_IDENTITY_RESOURCE_ID: ${{ vars.AZURE_WORKLOAD_IDENTITY_RESOURCE_ID }}
+          CONTAINER_APPS_SUBNET_PREFIX: ${{ vars.AZURE_CONTAINER_APPS_SUBNET_PREFIX }}
+        run: |
+          az extension add --name containerapp --upgrade --yes
+          if az containerapp show \
+            --name "$AZURE_CONTAINER_APP" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --output none 2>/dev/null; then
+            az containerapp update \
+              --name "$AZURE_CONTAINER_APP" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --image "$IMAGE"
+          else
+            envsubst '${ACR_LOGIN_SERVER} ${IMAGE} ${KEY_VAULT_URI} ${WORKLOAD_IDENTITY_RESOURCE_ID} ${CONTAINER_APPS_SUBNET_PREFIX}' \
+              < infra/containerapp.yaml > "$RUNNER_TEMP/containerapp.yaml"
+            az containerapp create \
+              --name "$AZURE_CONTAINER_APP" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --environment "$AZURE_CONTAINER_APP_ENVIRONMENT" \
+              --user-assigned "$WORKLOAD_IDENTITY_RESOURCE_ID" \
+              --yaml "$RUNNER_TEMP/containerapp.yaml"
+          fi
+
+      - name: Verify deployment readiness
+        run: |
+          fqdn="$(az containerapp show \
+            --name "$AZURE_CONTAINER_APP" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --query properties.configuration.ingress.fqdn \
+            --output tsv)"
+          curl --fail --silent --show-error --retry 20 --retry-delay 15 --retry-all-errors \
+            "https://$fqdn/health/ready"

@@ -1,0 +1,13 @@
+.git
+.github
+.vscode
+.env
+.gitignore
+.dockerignore
+**/bin
+**/obj
+**/node_modules
+**/coverage
+**/*.tsbuildinfo
+AlbumsWebApp.Tests
+wwwroot

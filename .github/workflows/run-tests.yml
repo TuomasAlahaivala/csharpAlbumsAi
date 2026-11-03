@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   test:
-    name: .NET tests
+    name: Test application
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -29,3 +29,25 @@ jobs:
 
       - name: Run tests
         run: dotnet test AlbumsWebApp.Tests/AlbumsWebApp.Tests.csproj --no-restore --configuration Release
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ClientApp/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ClientApp
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: ClientApp
+        run: npm run lint
+
+      - name: Test frontend
+        working-directory: ClientApp
+        run: npm test
+
+      - name: Build production container
+        run: docker build --tag albums-webapp:ci .

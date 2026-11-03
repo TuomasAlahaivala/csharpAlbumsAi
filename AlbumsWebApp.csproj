@@ -20,7 +20,7 @@
     <None Remove="AlbumsWebApp.Tests\**\*" />
   </ItemGroup>
 
-  <Target Name="BuildClient" BeforeTargets="ComputeFilesToPublish">
+  <Target Name="BuildClient" BeforeTargets="ComputeFilesToPublish" Condition="'$(SkipClientBuild)' != 'true'">
     <Exec WorkingDirectory="ClientApp" Command="npm ci" />
     <Exec WorkingDirectory="ClientApp" Command="npm run build" />
   </Target>
